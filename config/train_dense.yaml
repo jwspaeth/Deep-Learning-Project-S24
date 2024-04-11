@@ -1,0 +1,6 @@
+core:
+  name: train_dense
+
+hydra:
+  run:
+    dir: ${core.output_dir}
