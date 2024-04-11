@@ -12,6 +12,8 @@ from PIL import Image, ImageDraw
 from torch.utils import data
 from torchvision import transforms
 
+__all__ = ["VITONDataset", "VITONDataLoader"]
+
 
 class VITONDataset(data.Dataset):
     def __init__(self, opt):
