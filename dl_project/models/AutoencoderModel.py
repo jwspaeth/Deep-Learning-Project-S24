@@ -1,66 +1,198 @@
-import torch 
+import lightning as L
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from tqdm import tqdm
 
+
 class conv_layer(nn.Module):
-    def __init__(self, in_channels, out_channels,kernel_val, stride_val, padding_val):
+    def __init__(self, in_channels, out_channels, kernel_val, stride_val, padding_val):
         super().__init__()
 
         # The VITON U-Net contains 6 convolutional layers
         self.conv = nn.Sequential(
-            nn.Conv2d(in_channels,out_channels,kernel_size=kernel_val,stride=stride_val,padding=padding_val),
+            nn.Conv2d(
+                in_channels,
+                out_channels,
+                kernel_size=kernel_val,
+                stride=stride_val,
+                padding=padding_val,
+            ),
             nn.BatchNorm2d(out_channels),
-            nn.ReLu(inplace=True),
-            nn.Conv2d(in_channels,out_channels,kernel_size=kernel_val,stride=stride_val,padding=padding_val),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(
+                in_channels,
+                out_channels,
+                kernel_size=kernel_val,
+                stride=stride_val,
+                padding=padding_val,
+            ),
             nn.BatchNorm2d(out_channels),
-            nn.ReLu(inplace=True)
+            nn.ReLU(inplace=True),
         )
 
     def forward(self, x):
         return self.conv(x)
 
+
 class unet_model(nn.Module):
     # Should in channels be 4 or 2?
     # Are 2 out channels correct? Coarse result and clothing mask
-    def __init__(self, in_channels=4, out_channels=2, encoder_channels=[64,128,256,512,512,512], decoder_channels=[512,512,256,128,64,4], kernel_val=4, encoder_stride=2, decoder_stride=0.5, padding_val=1):
-        super(unet_model, self).__init___()
+    def __init__(
+        self,
+        in_channels=4,
+        out_channels=2,
+        encoder_channels=[64, 128, 256, 512, 512, 512],
+        decoder_channels=[512, 512, 256, 128, 64, 4],
+        kernel_val=4,
+        encoder_stride=2,
+        decoder_stride=0.5,
+        padding_val=1,
+    ):
+        super(unet_model, self).__init__()
 
         # Encoder convolution
-        self.enc_conv1 = conv_layer(in_channels,encoder_channels[0],kernel_val,encoder_stride,padding_val)
-        self.enc_conv2 = conv_layer(encoder_channels[0],encoder_channels[1],kernel_val,encoder_stride,padding_val)
-        self.enc_conv3 = conv_layer(encoder_channels[1],encoder_channels[2],kernel_val,encoder_stride,padding_val)
-        self.enc_conv4 = conv_layer(encoder_channels[2],encoder_channels[3],kernel_val,encoder_stride,padding_val)
-        self.enc_conv5 = conv_layer(encoder_channels[3],encoder_channels[4],kernel_val,encoder_stride,padding_val)
-        self.enc_conv6 = conv_layer(encoder_channels[4],encoder_channels[5],kernel_val,encoder_stride,padding_val)
+        self.enc_conv1 = conv_layer(
+            in_channels, encoder_channels[0], kernel_val, encoder_stride, padding_val
+        )
+        self.enc_conv2 = conv_layer(
+            encoder_channels[0],
+            encoder_channels[1],
+            kernel_val,
+            encoder_stride,
+            padding_val,
+        )
+        self.enc_conv3 = conv_layer(
+            encoder_channels[1],
+            encoder_channels[2],
+            kernel_val,
+            encoder_stride,
+            padding_val,
+        )
+        self.enc_conv4 = conv_layer(
+            encoder_channels[2],
+            encoder_channels[3],
+            kernel_val,
+            encoder_stride,
+            padding_val,
+        )
+        self.enc_conv5 = conv_layer(
+            encoder_channels[3],
+            encoder_channels[4],
+            kernel_val,
+            encoder_stride,
+            padding_val,
+        )
+        self.enc_conv6 = conv_layer(
+            encoder_channels[4],
+            encoder_channels[5],
+            kernel_val,
+            encoder_stride,
+            padding_val,
+        )
 
         # Pooling and bottleneck
-        self.pool = nn.MaxPool2d((2,2),stride=2)
-        self.bottleneck = conv_layer(encoder_channels[5],encoder_channels[5]*2)
+        self.pool = nn.MaxPool2d((2, 2), stride=2)
+        self.bottleneck = conv_layer(encoder_channels[5], encoder_channels[5] * 2)
 
         # Decoder convolution
-        self.dec_trans1 = nn.ConvTranspose2d(encoder_channels[5]*2,decoder_channels[0],kernel_size=kernel_val,stride=decoder_stride,padding=0)
-        self.dec_conv1 = conv_layer(encoder_channels[5]*2,decoder_channels[0],kernel_val,decoder_stride,padding_val)
+        self.dec_trans1 = nn.ConvTranspose2d(
+            encoder_channels[5] * 2,
+            decoder_channels[0],
+            kernel_size=kernel_val,
+            stride=decoder_stride,
+            padding=0,
+        )
+        self.dec_conv1 = conv_layer(
+            encoder_channels[5] * 2,
+            decoder_channels[0],
+            kernel_val,
+            decoder_stride,
+            padding_val,
+        )
 
-        self.dec_trans2 = nn.ConvTranspose2d(decoder_channels[0],decoder_channels[1],kernel_size=kernel_val,stride=decoder_stride,padding=0)
-        self.dec_conv2 = conv_layer(decoder_channels[0],decoder_channels[1],kernel_val,decoder_stride,padding_val)
+        self.dec_trans2 = nn.ConvTranspose2d(
+            decoder_channels[0],
+            decoder_channels[1],
+            kernel_size=kernel_val,
+            stride=decoder_stride,
+            padding=0,
+        )
+        self.dec_conv2 = conv_layer(
+            decoder_channels[0],
+            decoder_channels[1],
+            kernel_val,
+            decoder_stride,
+            padding_val,
+        )
 
-        self.dec_trans3 = nn.ConvTranspose2d(decoder_channels[1],decoder_channels[2],kernel_size=kernel_val,stride=decoder_stride,padding=0)
-        self.dec_conv3 = conv_layer(decoder_channels[1],decoder_channels[2],kernel_val,decoder_stride,padding_val)
+        self.dec_trans3 = nn.ConvTranspose2d(
+            decoder_channels[1],
+            decoder_channels[2],
+            kernel_size=kernel_val,
+            stride=decoder_stride,
+            padding=0,
+        )
+        self.dec_conv3 = conv_layer(
+            decoder_channels[1],
+            decoder_channels[2],
+            kernel_val,
+            decoder_stride,
+            padding_val,
+        )
 
-        self.dec_trans4 = nn.ConvTranspose2d(decoder_channels[2],decoder_channels[3],kernel_size=kernel_val,stride=decoder_stride,padding=0)
-        self.dec_conv4 = conv_layer(decoder_channels[2],decoder_channels[3],kernel_val,decoder_stride,padding_val)
+        self.dec_trans4 = nn.ConvTranspose2d(
+            decoder_channels[2],
+            decoder_channels[3],
+            kernel_size=kernel_val,
+            stride=decoder_stride,
+            padding=0,
+        )
+        self.dec_conv4 = conv_layer(
+            decoder_channels[2],
+            decoder_channels[3],
+            kernel_val,
+            decoder_stride,
+            padding_val,
+        )
 
-        self.dec_trans5 = nn.ConvTranspose2d(decoder_channels[3],decoder_channels[4],kernel_size=kernel_val,stride=decoder_stride,padding=0)
-        self.dec_conv5 = conv_layer(decoder_channels[3],decoder_channels[4],kernel_val,decoder_stride,padding_val)
+        self.dec_trans5 = nn.ConvTranspose2d(
+            decoder_channels[3],
+            decoder_channels[4],
+            kernel_size=kernel_val,
+            stride=decoder_stride,
+            padding=0,
+        )
+        self.dec_conv5 = conv_layer(
+            decoder_channels[3],
+            decoder_channels[4],
+            kernel_val,
+            decoder_stride,
+            padding_val,
+        )
 
-        self.dec_trans6 = nn.ConvTranspose2d(decoder_channels[4],decoder_channels[5],kernel_size=kernel_val,stride=decoder_stride,padding=0)
-        self.dec_conv6 = conv_layer(decoder_channels[4],decoder_channels[5],kernel_val,decoder_stride,padding_val)
+        self.dec_trans6 = nn.ConvTranspose2d(
+            decoder_channels[4],
+            decoder_channels[5],
+            kernel_size=kernel_val,
+            stride=decoder_stride,
+            padding=0,
+        )
+        self.dec_conv6 = conv_layer(
+            decoder_channels[4],
+            decoder_channels[5],
+            kernel_val,
+            decoder_stride,
+            padding_val,
+        )
 
         # Final output
-        self.conv_out = nn.Conv2d(decoder_channels[5],out_channels,kernel_val,decoder_stride,padding_val)
+        self.conv_out = nn.Conv2d(
+            decoder_channels[5], out_channels, kernel_val, decoder_stride, padding_val
+        )
 
-    def forward(self,x):
-        skip_connections=[]
+    def forward(self, x):
+        skip_connections = []
 
         # Encoder
         s1 = self.enc_conv1.forward(x)
@@ -94,24 +226,24 @@ class unet_model(nn.Module):
 
         # Decoder
         s5 = self.dec_trans1(bn)
-        cat1 = torch.cat([s5,skip_connections[3]],axis=1)
+        cat1 = torch.cat([s5, skip_connections[3]], axis=1)
         s6 = self.dec_conv1.forward(cat1)
         # print(f"S5: {s5.shape}. Cat1: {cat1.shape}. S6: {s6.shape}")
 
         s7 = self.dec_trans2(s6)
-        cat2 = torch.cat([s7,skip_connections[2]],axis=1)
+        cat2 = torch.cat([s7, skip_connections[2]], axis=1)
         s8 = self.dec_conv2.forward(cat2)
         # print(f"S7: {s7.shape}. Cat2: {cat2.shape}. S8: {s8.shape}")
 
         s9 = self.dec_trans3(s8)
-        cat3 = torch.cat([s9,skip_connections[1]],axis=1)
+        cat3 = torch.cat([s9, skip_connections[1]], axis=1)
         s10 = self.dec_conv3.forward(cat3)
         # print(f"S9: {s9.shape}. Cat3: {cat3.shape}. S10: {s10.shape}")
 
         s11 = self.dec_trans4(s10)
-        _,_,s11_h,s11_w = s11.shape
+        _, _, s11_h, s11_w = s11.shape
         skip_resize = skip_connections[0][:, :, :s11_h, :s11_w]
-        cat4 = torch.cat([s11,skip_resize],axis=1)
+        cat4 = torch.cat([s11, skip_resize], axis=1)
         s12 = self.dec_conv4.forward(cat4)
         # print(f"S11: {s11.shape}. Cat4: {cat4.shape}. S12: {s12.shape}")
 
@@ -120,40 +252,49 @@ class unet_model(nn.Module):
 
         return x
 
-def train_epoch(data_loader, model, optimizer,device):
 
-    loop = tqdm(data_loader)
-    model = model.to(device)
+class UNetModel_Lit(L.LightningModule):
+    def __init__(self, lr: int = 1e-3, **kwargs):
+        super().__init__()
+        self.lr = lr
 
-    model.train()
+        self.model = unet_model(**kwargs)
 
-    for batch in loop:
-        # Move data and targets to the appropriate device
-        # Targets should have 2 outputs - coarse result and clothing mask
-        training_data, targets = batch
-        training_data, targets = training_data.to(device), targets.to(device)
+    def training_step(self, batch, batch_idx):
+        # Define dummy training to verify training works
+        x = batch["pose"]
+        y = x
+        y_hat = self.model(x)
+        loss = F.mse_loss(y_hat, y) + F.l1_loss(y_hat, y)
+        self.log("loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        return loss
 
-        # Forward pass
-        predictions = model(training_data)
+    def validation_step(self, batch, batch_idx):
+        # Define dummy training to verify training works
+        x = batch["pose"]
+        y = x
+        y_hat = self.model(x)
+        loss = F.mse_loss(y_hat, y) + F.l1_loss(y_hat, y)
+        self.log("loss", loss)
+        return loss
 
-        # Compute the loss
-        # Predictions should have 2 outputs - coarse result and clothing mask
-        # Coarse result: Perceptual loss - requires a pre-trained CNN... consider MSE 
-        # loss for pizel level loss
-        # Clothing mask: L1 loss
-        mse_func = nn.MSELoss()
-        mse_loss = mse_func(predictions[0],targets[0])
-        l1_func = nn.L1Loss()
-        l1_loss = l1_func(predictions[1],targets[1])
+    def test_step(self, batch, batch_idx):
+        # Define dummy training to verify training works
+        x = batch["pose"]
+        y = x
+        y_hat = self.model(x)
+        loss = F.mse_loss(y_hat, y) + F.l1_loss(y_hat, y)
+        self.log("loss", loss)
+        return loss
 
-        loss = mse_loss + l1_loss
+    def predict_step(self, batch, batch_idx):
+        # Define dummy training to verify training works
+        x = batch["pose"]
+        y = x
+        y_hat = self.model(x)
+        loss = F.mse_loss(y_hat, y) + F.l1_loss(y_hat, y)
+        return loss
 
-        # Zero grad, backpropagate, and update optimizer
-        optimizer.zero_grad()
-        loss.backward() # do i need to back prop each individual loss or total loss?
-        optimizer.step()
-
-        # Print loss training metric
-        loop.set_description(f"Loss: {loss.item():.4f}")
-
-    loop.close()
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        return optimizer
