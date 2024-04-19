@@ -14,3 +14,7 @@
 
 ### Jupyter Notebook
 - Open dl_project/main.ipynb and run the cells. Replace the config name with your config.
+
+## References
+- [Pytorch-Lightning documentation](https://lightning.ai/docs/pytorch/stable/)
+- [Hydra documentation](https://hydra.cc/docs/intro/)
