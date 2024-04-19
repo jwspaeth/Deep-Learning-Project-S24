@@ -6,22 +6,31 @@ Package not installable so must be copied.
 import json
 from os import path as osp
 
+import lightning as L
 import numpy as np
 import torch
 from PIL import Image, ImageDraw
 from torch.utils import data
 from torchvision import transforms
 
-__all__ = ["VITONDataset", "VITONDataLoader"]
+__all__ = ["VITONDataset", "VITONDataLoader", "VITONDataModule"]
 
 
 class VITONDataset(data.Dataset):
-    def __init__(self, opt):
+    def __init__(
+        self,
+        load_height,
+        load_width,
+        semantic_nc,
+        dataset_dir,
+        dataset_mode,
+        dataset_list,
+    ):
         super().__init__()
-        self.load_height = opt.load_height
-        self.load_width = opt.load_width
-        self.semantic_nc = opt.semantic_nc
-        self.data_path = osp.join(opt.dataset_dir, opt.dataset_mode)
+        self.load_height = load_height
+        self.load_width = load_width
+        self.semantic_nc = semantic_nc
+        self.data_path = osp.join(dataset_dir, dataset_mode)
         self.transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -32,7 +41,7 @@ class VITONDataset(data.Dataset):
         # load data list
         img_names = []
         c_names = []
-        with open(osp.join(opt.dataset_dir, opt.dataset_list), "r") as f:
+        with open(osp.join(dataset_dir, dataset_list), "r") as f:
             for line in f.readlines():
                 img_name, c_name = line.strip().split()
                 img_names.append(img_name)
@@ -188,12 +197,12 @@ class VITONDataset(data.Dataset):
 
         # load pose image
         pose_name = img_name.replace(".jpg", "_rendered.png")
-        pose_rgb = Image.open(osp.join(self.data_path, "openpose-img", pose_name))
+        pose_rgb = Image.open(osp.join(self.data_path, "openpose_img", pose_name))
         pose_rgb = transforms.Resize(self.load_width, interpolation=2)(pose_rgb)
         pose_rgb = self.transform(pose_rgb)  # [-1,1]
 
         pose_name = img_name.replace(".jpg", "_keypoints.json")
-        with open(osp.join(self.data_path, "openpose-json", pose_name), "r") as f:
+        with open(osp.join(self.data_path, "openpose_json", pose_name), "r") as f:
             pose_label = json.load(f)
             pose_data = pose_label["people"][0]["pose_keypoints_2d"]
             pose_data = np.array(pose_data)
@@ -201,7 +210,7 @@ class VITONDataset(data.Dataset):
 
         # load parsing image
         parse_name = img_name.replace(".jpg", ".png")
-        parse = Image.open(osp.join(self.data_path, "image-parse", parse_name))
+        parse = Image.open(osp.join(self.data_path, "image-parse-v3", parse_name))
         parse = transforms.Resize(self.load_width, interpolation=0)(parse)
         parse_agnostic = self.get_parse_agnostic(parse, pose_data)
         parse_agnostic = torch.from_numpy(np.array(parse_agnostic)[None]).long()
@@ -256,19 +265,19 @@ class VITONDataset(data.Dataset):
 
 
 class VITONDataLoader:
-    def __init__(self, opt, dataset):
+    def __init__(self, shuffle, batch_size, workers, dataset):
         super().__init__()
 
-        if opt.shuffle:
+        if shuffle:
             train_sampler = data.sampler.RandomSampler(dataset)
         else:
             train_sampler = None
 
         self.data_loader = data.DataLoader(
             dataset,
-            batch_size=opt.batch_size,
+            batch_size=batch_size,
             shuffle=(train_sampler is None),
-            num_workers=opt.workers,
+            num_workers=workers,
             pin_memory=True,
             drop_last=True,
             sampler=train_sampler,
@@ -284,3 +293,85 @@ class VITONDataLoader:
             batch = self.data_iter.__next__()
 
         return batch
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self.next_batch()
+
+    def __len__(self):
+        return len(self.data_loader)
+
+
+class VITONDataModule(L.LightningDataModule):
+    def __init__(
+        self,
+        shuffle,
+        batch_size,
+        workers,
+        load_height=1024,
+        load_width=768,
+        semantic_nc=13,
+        dataset_dir="data/zalando-hd-resized",
+    ):
+        super().__init__()
+        self.shuffle = shuffle
+        self.batch_size = batch_size
+        self.workers = workers
+        self.load_height = load_height
+        self.load_width = load_width
+        self.semantic_nc = semantic_nc
+        self.dataset_dir = dataset_dir
+
+    @property
+    def dataset_kwargs(self):
+        kwargs = {
+            "load_height": self.load_height,
+            "load_width": self.load_width,
+            "semantic_nc": self.semantic_nc,
+            "dataset_dir": self.dataset_dir,
+        }
+        return kwargs
+
+    def setup(self, stage: str):
+        self.train_dataset = VITONDataset(
+            **self.dataset_kwargs,
+            dataset_mode="train",
+            dataset_list="train_pairs.txt",
+        )
+        self.test_dataset = VITONDataset(
+            **self.dataset_kwargs, dataset_mode="test", dataset_list="test_pairs.txt"
+        )
+
+    def train_dataloader(self):
+        return VITONDataLoader(
+            dataset=self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=self.shuffle,
+            workers=self.workers,
+        )
+
+    def val_dataloader(self):
+        return VITONDataLoader(
+            dataset=self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            workers=self.workers,
+        )
+
+    def test_dataloader(self):
+        return VITONDataLoader(
+            dataset=self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            workers=self.workers,
+        )
+
+    def predict_dataloader(self):
+        return VITONDataLoader(
+            dataset=self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            workers=self.workers,
+        )
