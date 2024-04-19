@@ -8,4 +8,9 @@
 
 ## Usage
 - Populate a config in "configs/" with your parameters. "train_dense.yaml" is provided as an example and runs a dummy dense network for debugging.
+
+### Command Line
 - Train with "python dl_project/main.py --config-name=\<config name\>"
+
+### Jupyter Notebook
+- Open dl_project/main.ipynb and run the cells. Replace the config name with your config.
