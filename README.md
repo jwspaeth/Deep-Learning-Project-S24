@@ -3,6 +3,7 @@
 ## Install
 - Install the conda environment with "conda env create -f environment.yaml"
 - Install the package locally with "pip install -e ."
+- Download the dataset from the [VITONHD Dropbox](https://www.dropbox.com/scl/fi/xu08cx3fxmiwpg32yotd7/zalando-hd-resized.zip?rlkey=ks83mdv2pvmrdl2oo2bmmn69w&e=1&dl=0). Extract the zip and put the data in the "data/" folder.
 
 
 ## Usage
