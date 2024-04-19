@@ -13,7 +13,7 @@
 - Train with "python dl_project/main.py --config-name=\<config name\>"
 
 ### Jupyter Notebook
-- Open dl_project/main.ipynb and run the cells. Replace the config name with your config.
+- Open main.ipynb and run the cells. Replace the config name with your config.
 
 ## References
 - [Pytorch-Lightning documentation](https://lightning.ai/docs/pytorch/stable/)
