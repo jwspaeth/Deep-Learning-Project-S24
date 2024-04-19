@@ -10,6 +10,7 @@ __all__ = ["DenseModel", "DenseModel_Lit"]
 
 class DenseModel(nn.Module):
     def __init__(self, input_size: int, hidden_layers: List[int], output_size: int):
+        super().__init__()
         self.input_size = input_size
         self.hidden_layers = hidden_layers
         self.output_size = output_size
@@ -47,11 +48,41 @@ class DenseModel_Lit(L.LightningModule):
         self.model = DenseModel(input_size, hidden_layers, output_size)
 
     def training_step(self, batch, batch_idx):
-        # training_step defines the train loop.
-        x, y = batch
+        # Define dummy training to verify training works
+        pose = batch["pose"]
+        x = pose[:, 0, :10, 0]
         x = x.view(x.size(0), -1)
-        z = self.encoder(x)
-        x_hat = self.decoder(z)
+        x_hat = self.model(x)
+        loss = F.mse_loss(x_hat, x)
+        self.log("loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        # Define dummy training to verify training works
+        pose = batch["pose"]
+        x = pose[:, 0, :10, 0]
+        x = x.view(x.size(0), -1)
+        x_hat = self.model(x)
+        loss = F.mse_loss(x_hat, x)
+        self.log("loss", loss)
+        return loss
+
+    def test_step(self, batch, batch_idx):
+        # Define dummy training to verify training works
+        pose = batch["pose"]
+        x = pose[:, 0, :10, 0]
+        x = x.view(x.size(0), -1)
+        x_hat = self.model(x)
+        loss = F.mse_loss(x_hat, x)
+        self.log("loss", loss)
+        return loss
+
+    def predict_step(self, batch, batch_idx):
+        # Define dummy training to verify training works
+        pose = batch["pose"]
+        x = pose[:, 0, :10, 0]
+        x = x.view(x.size(0), -1)
+        x_hat = self.model(x)
         loss = F.mse_loss(x_hat, x)
         return loss
 

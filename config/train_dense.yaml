@@ -2,10 +2,33 @@ core:
   name: train_dense
   output_dir: ./output/${core.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
-dataset: None
-dataloader: None
-model: None
-
 hydra:
   run:
     dir: ${core.output_dir}
+
+## Populated with default values from VITON-HD github
+## Parameters explained in their respective classes
+trainer:
+  accelerator: gpu
+  max_epochs: 2
+  default_root_dir: ${core.output_dir}
+  limit_train_batches: 10 # Included as debugging tool
+  limit_val_batches: 10 # Included as debugging tool
+  log_every_n_steps: 5
+
+data:
+  shuffle: True
+  batch_size: 1
+  workers: 1
+  load_height: 1024
+  load_width: 768
+  semantic_nc: 13
+  dataset_dir: data/zalando-hd-resized
+
+model:
+  _target_: dl_project.models.DenseModel_Lit
+  input_size: 10
+  hidden_layers: [15]
+  output_size: 10
+  lr: 1e-3
+
