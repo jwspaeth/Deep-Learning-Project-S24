@@ -11,5 +11,6 @@ setup(
         "hydra-core",
         "tensorboard==2.15.1",
         "dropbox",
+        "matplotlib",
     ],
 )

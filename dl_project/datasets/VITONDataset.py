@@ -180,6 +180,7 @@ class VITONDataset(data.Dataset):
         c_name = {}
         c = {}
         cm = {}
+        cwm = {}
         for key in self.c_names:
             c_name[key] = self.c_names[key][index]
             c[key] = Image.open(osp.join(self.data_path, "cloth", c_name[key])).convert(
@@ -188,6 +189,18 @@ class VITONDataset(data.Dataset):
             c[key] = transforms.Resize(self.load_width, interpolation=2)(c[key])
             cm[key] = Image.open(osp.join(self.data_path, "cloth-mask", c_name[key]))
             cm[key] = transforms.Resize(self.load_width, interpolation=0)(cm[key])
+
+            try:
+                cwm[key] = Image.open(
+                    osp.join(self.data_path, "gt_cloth_warped_mask", c_name[key])
+                )
+                cwm[key] = transforms.Resize(self.load_width, interpolation=0)(cm[key])
+                cwm_array = np.array(cwm[key])
+                cwm_array = (cwm_array >= 128).astype(np.float32)
+                cwm[key] = torch.from_numpy(cwm_array)  # [0,1]
+                cwm[key].unsqueeze_(0)
+            except FileNotFoundError:
+                pass
 
             c[key] = self.transform(c[key])  # [-1,1]
             cm_array = np.array(cm[key])
@@ -257,6 +270,7 @@ class VITONDataset(data.Dataset):
             "pose": pose_rgb,
             "cloth": c,
             "cloth_mask": cm,
+            "cloth_warped_mask": cwm,
         }
         return result
 
@@ -340,8 +354,11 @@ class VITONDataModule(L.LightningDataModule):
             dataset_mode="train",
             dataset_list="train_pairs.txt",
         )
+
         self.test_dataset = VITONDataset(
-            **self.dataset_kwargs, dataset_mode="test", dataset_list="test_pairs.txt"
+            **self.dataset_kwargs,
+            dataset_mode="test",
+            dataset_list="test_pairs.txt",
         )
 
     def train_dataloader(self):
