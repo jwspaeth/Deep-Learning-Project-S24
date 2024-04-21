@@ -12,5 +12,6 @@ setup(
         "tensorboard==2.15.1",
         "dropbox",
         "matplotlib",
+        "opencv-python",
     ],
 )
