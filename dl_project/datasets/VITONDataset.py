@@ -194,7 +194,7 @@ class VITONDataset(data.Dataset):
                 cwm[key] = Image.open(
                     osp.join(self.data_path, "gt_cloth_warped_mask", c_name[key])
                 )
-                cwm[key] = transforms.Resize(self.load_width, interpolation=0)(cm[key])
+                cwm[key] = transforms.Resize(self.load_width, interpolation=0)(cwm[key])
                 cwm_array = np.array(cwm[key])
                 cwm_array = (cwm_array >= 128).astype(np.float32)
                 cwm[key] = torch.from_numpy(cwm_array)  # [0,1]
