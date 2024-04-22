@@ -6,15 +6,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
-<<<<<<< HEAD
-=======
-import matplotlib.pyplot as plt
-import numpy as np
-
 import cv2
 import os
-
->>>>>>> 1e12872 (updates for image saving after epochs)
 
 class conv_layer(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_val, stride_val, padding_val):
