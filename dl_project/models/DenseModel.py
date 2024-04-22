@@ -45,6 +45,8 @@ class DenseModel_Lit(L.LightningModule):
         lr: int = 1e-3,
     ):
         super().__init__()
+        self.save_hyperparameters()
+
         self.lr = lr
 
         self.model = DenseModel(input_size, hidden_layers, output_size)

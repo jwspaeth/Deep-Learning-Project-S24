@@ -1,11 +1,10 @@
 import lightning as L
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
-
-import matplotlib.pyplot as plt
-import numpy as np
 
 
 class conv_layer(nn.Module):
@@ -20,7 +19,7 @@ class conv_layer(nn.Module):
                 kernel_size=kernel_val,
                 stride=stride_val,
                 padding=padding_val,
-                bias=False
+                bias=False,
             ),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
@@ -30,7 +29,7 @@ class conv_layer(nn.Module):
                 kernel_size=kernel_val,
                 stride=stride_val,
                 padding=padding_val,
-                bias=False
+                bias=False,
             ),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
@@ -79,10 +78,16 @@ class unet_model(nn.Module):
             encoder_stride,
             padding_val,
         )
-        
+
         # Pooling and bottleneck
         self.pool = nn.MaxPool2d((2, 2), stride=2)
-        self.bottleneck = conv_layer(encoder_channels[3], encoder_channels[3] * 2, kernel_val, encoder_stride, padding_val)
+        self.bottleneck = conv_layer(
+            encoder_channels[3],
+            encoder_channels[3] * 2,
+            kernel_val,
+            encoder_stride,
+            padding_val,
+        )
 
         # Decoder convolution
         self.dec_trans1 = nn.ConvTranspose2d(
@@ -90,7 +95,7 @@ class unet_model(nn.Module):
             decoder_channels[0],
             kernel_size=2,
             stride=2,
-            padding=0
+            padding=0,
         )
         self.dec_conv1 = conv_layer(
             encoder_channels[3] * 2,
@@ -101,11 +106,7 @@ class unet_model(nn.Module):
         )
 
         self.dec_trans2 = nn.ConvTranspose2d(
-            decoder_channels[0],
-            decoder_channels[1],
-            kernel_size=2,
-            stride=2,
-            padding=0
+            decoder_channels[0], decoder_channels[1], kernel_size=2, stride=2, padding=0
         )
         self.dec_conv2 = conv_layer(
             decoder_channels[0],
@@ -116,11 +117,7 @@ class unet_model(nn.Module):
         )
 
         self.dec_trans3 = nn.ConvTranspose2d(
-            decoder_channels[1],
-            decoder_channels[2],
-            kernel_size=2,
-            stride=2,
-            padding=0
+            decoder_channels[1], decoder_channels[2], kernel_size=2, stride=2, padding=0
         )
         self.dec_conv3 = conv_layer(
             decoder_channels[1],
@@ -131,11 +128,7 @@ class unet_model(nn.Module):
         )
 
         self.dec_trans4 = nn.ConvTranspose2d(
-            decoder_channels[2],
-            decoder_channels[3],
-            kernel_size=2,
-            stride=2,
-            padding=0
+            decoder_channels[2], decoder_channels[3], kernel_size=2, stride=2, padding=0
         )
         self.dec_conv4 = conv_layer(
             decoder_channels[2],
@@ -179,24 +172,24 @@ class unet_model(nn.Module):
 
         # Decoder
         s5 = self.dec_trans1(bn)
-        cat1 = torch.cat([s5,skip_connections[3]],axis=1)
+        cat1 = torch.cat([s5, skip_connections[3]], axis=1)
         s6 = self.dec_conv1.forward(cat1)
         # print(f"S5: {s5.shape}. Cat1: {cat1.shape}. S6: {s6.shape}")
 
         s7 = self.dec_trans2(s6)
-        cat2 = torch.cat([s7,skip_connections[2]],axis=1)
+        cat2 = torch.cat([s7, skip_connections[2]], axis=1)
         s8 = self.dec_conv2.forward(cat2)
         # print(f"S7: {s7.shape}. Cat2: {cat2.shape}. S8: {s8.shape}")
 
         s9 = self.dec_trans3(s8)
-        cat3 = torch.cat([s9,skip_connections[1]],axis=1)
+        cat3 = torch.cat([s9, skip_connections[1]], axis=1)
         s10 = self.dec_conv3.forward(cat3)
         # print(f"S9: {s9.shape}. Cat3: {cat3.shape}. S10: {s10.shape}")
 
         s11 = self.dec_trans4(s10)
-        _,_,s11_h,s11_w = s11.shape
+        _, _, s11_h, s11_w = s11.shape
         skip_resize = skip_connections[0][:, :, :s11_h, :s11_w]
-        cat4 = torch.cat([s11,skip_resize],axis=1)
+        cat4 = torch.cat([s11, skip_resize], axis=1)
         s12 = self.dec_conv4.forward(cat4)
         # print(f"S11: {s11.shape}. Cat4: {cat4.shape}. S12: {s12.shape}")
 
@@ -209,6 +202,8 @@ class unet_model(nn.Module):
 class UNetModel_Lit(L.LightningModule):
     def __init__(self, lr: int = 1e-3, **kwargs):
         super().__init__()
+        self.save_hyperparameters()
+
         self.lr = lr
 
         self.model = unet_model(**kwargs)
@@ -219,18 +214,22 @@ class UNetModel_Lit(L.LightningModule):
         batch_img_agnostic = batch["img_agnostic"]
         batch_parse_agnostic = batch["parse_agnostic"]
         batch_cloth = batch["cloth"]["unpaired"]
-        cat_input = torch.cat((batch_pose,batch_img_agnostic,batch_parse_agnostic,batch_cloth),dim=1)
-        
+        cat_input = torch.cat(
+            (batch_pose, batch_img_agnostic, batch_parse_agnostic, batch_cloth), dim=1
+        )
+
         # Model
         model_output = self.model(cat_input)
         coarse_result = model_output[:, :3, :, :]
-        cloth_mask = model_output[:,3:4,:,:]
-        
+        cloth_mask = model_output[:, 3:4, :, :]
+
         # Loss estimation
         target_img = batch["img"]
         target_cloth = batch["cloth_mask"]["unpaired"]
 
-        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(cloth_mask, target_cloth)
+        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
+            cloth_mask, target_cloth
+        )
         self.log("loss", loss)
 
         return loss
@@ -241,42 +240,50 @@ class UNetModel_Lit(L.LightningModule):
         batch_img_agnostic = batch["img_agnostic"]
         batch_parse_agnostic = batch["parse_agnostic"]
         batch_cloth = batch["cloth"]["unpaired"]
-        cat_input = torch.cat((batch_pose,batch_img_agnostic,batch_parse_agnostic,batch_cloth),dim=1)
-        
+        cat_input = torch.cat(
+            (batch_pose, batch_img_agnostic, batch_parse_agnostic, batch_cloth), dim=1
+        )
+
         # Model
         model_output = self.model(cat_input)
         coarse_result = model_output[:, :3, :, :]
-        cloth_mask = model_output[:,3:4,:,:]
-        
+        cloth_mask = model_output[:, 3:4, :, :]
+
         # Loss estimation
         target_img = batch["img"]
         target_cloth = batch["cloth_mask"]["unpaired"]
 
-        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(cloth_mask, target_cloth)
+        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
+            cloth_mask, target_cloth
+        )
         self.log("loss", loss)
-        
+
         return loss
 
     def test_step(self, batch, batch_idx):
-       # Model inputs
+        # Model inputs
         batch_pose = batch["pose"]
         batch_img_agnostic = batch["img_agnostic"]
         batch_parse_agnostic = batch["parse_agnostic"]
         batch_cloth = batch["cloth"]["unpaired"]
-        cat_input = torch.cat((batch_pose,batch_img_agnostic,batch_parse_agnostic,batch_cloth),dim=1)
-        
+        cat_input = torch.cat(
+            (batch_pose, batch_img_agnostic, batch_parse_agnostic, batch_cloth), dim=1
+        )
+
         # Model
         model_output = self.model(cat_input)
         coarse_result = model_output[:, :3, :, :]
-        cloth_mask = model_output[:,3:4,:,:]
-        
+        cloth_mask = model_output[:, 3:4, :, :]
+
         # Loss estimation
         target_img = batch["img"]
         target_cloth = batch["cloth_mask"]["unpaired"]
 
-        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(cloth_mask, target_cloth)
+        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
+            cloth_mask, target_cloth
+        )
         self.log("loss", loss)
-        
+
         return loss
 
     def predict_step(self, batch, batch_idx):
@@ -285,20 +292,24 @@ class UNetModel_Lit(L.LightningModule):
         batch_img_agnostic = batch["img_agnostic"]
         batch_parse_agnostic = batch["parse_agnostic"]
         batch_cloth = batch["cloth"]["unpaired"]
-        cat_input = torch.cat((batch_pose,batch_img_agnostic,batch_parse_agnostic,batch_cloth),dim=1)
-        
+        cat_input = torch.cat(
+            (batch_pose, batch_img_agnostic, batch_parse_agnostic, batch_cloth), dim=1
+        )
+
         # Model
         model_output = self.model(cat_input)
         coarse_result = model_output[:, :3, :, :]
-        cloth_mask = model_output[:,3:4,:,:]
-        
+        cloth_mask = model_output[:, 3:4, :, :]
+
         # Loss estimation
         target_img = batch["img"]
         target_cloth = batch["cloth_mask"]["unpaired"]
 
-        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(cloth_mask, target_cloth)
+        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
+            cloth_mask, target_cloth
+        )
         self.log("loss", loss)
-        
+
         return loss
 
     def configure_optimizers(self):
