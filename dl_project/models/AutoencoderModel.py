@@ -6,6 +6,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
+<<<<<<< HEAD
+=======
+import matplotlib.pyplot as plt
+import numpy as np
+
+import cv2
+import os
+
+>>>>>>> 1e12872 (updates for image saving after epochs)
 
 class conv_layer(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_val, stride_val, padding_val):
@@ -207,6 +216,8 @@ class UNetModel_Lit(L.LightningModule):
         self.lr = lr
 
         self.model = unet_model(**kwargs)
+        self.validation_step_outputs_cr = []
+        self.validation_step_outputs_cm = []
 
     def training_step(self, batch, batch_idx):
         # Model inputs
@@ -225,12 +236,20 @@ class UNetModel_Lit(L.LightningModule):
 
         # Loss estimation
         target_img = batch["img"]
-        target_cloth = batch["cloth_mask"]["unpaired"]
+        target_cloth = batch["cloth_warped_mask"]["unpaired"]
 
         loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
             cloth_mask, target_cloth
         )
         self.log("loss", loss)
+
+        # Track output image
+        image = model_output[:, :3, :, :]
+        # image = batch["cloth_mask"]["unpaired"]
+        self.validation_step_outputs_cr.append(image)
+        image = model_output[:, 3:4, :, :]
+        # image = target_cloth
+        self.validation_step_outputs_cm.append(image)
 
         return loss
 
@@ -257,8 +276,33 @@ class UNetModel_Lit(L.LightningModule):
             cloth_mask, target_cloth
         )
         self.log("loss", loss)
-
+        
         return loss
+
+    def on_validation_epoch_end(self):
+        # Example of saving images to tensorboard
+        if len(self.validation_step_outputs_cr)==0:
+            return 
+
+        all_preds_cr = torch.cat(self.validation_step_outputs_cr, dim=0)
+        all_preds_cm = torch.cat(self.validation_step_outputs_cm, dim=0)
+        self.logger.experiment.add_images(tag="images", img_tensor=all_preds_cr)
+        self.logger.experiment.add_images(tag="images", img_tensor=all_preds_cm)
+        self.validation_step_outputs_cr.clear()  # free memory
+        self.validation_step_outputs_cm.clear()  # free memory
+
+        # Example of saving images with cv2
+        all_preds_cr = all_preds_cr.permute([0, 2, 3, 1]).cpu().numpy() * 255
+        all_preds_cm = all_preds_cm.permute([0, 2, 3, 1]).cpu().numpy() * 255
+        image_dir = f"{self.logger.save_dir}/images/epoch_{self.current_epoch}"
+        if not os.path.exists(image_dir):
+            os.makedirs(image_dir)
+        for i in range(all_preds_cr.shape[0]):
+            pred = cv2.cvtColor(all_preds_cr[i], cv2.COLOR_RGB2BGR)
+            cv2.imwrite(f"{image_dir}/{i:04d}_cr.png", pred)
+        for i in range(all_preds_cm.shape[0]):
+            pred = cv2.cvtColor(all_preds_cm[i], cv2.COLOR_RGB2BGR)
+            cv2.imwrite(f"{image_dir}/{i:04d}_cm.png", pred)
 
     def test_step(self, batch, batch_idx):
         # Model inputs
@@ -283,7 +327,7 @@ class UNetModel_Lit(L.LightningModule):
             cloth_mask, target_cloth
         )
         self.log("loss", loss)
-
+        
         return loss
 
     def predict_step(self, batch, batch_idx):
