@@ -181,11 +181,18 @@ class VITONDataset(data.Dataset):
         c = {}
         cm = {}
         cwm = {}
+
         for key in self.c_names:
+            
             c_name[key] = self.c_names[key][index]
-            c[key] = Image.open(osp.join(self.data_path, "cloth", c_name[key])).convert(
+
+            # c[key] = Image.open(osp.join(self.data_path, "cloth", c_name[key])).convert(
+            #     "RGB"
+            # )
+            c[key] = Image.open(osp.join(self.data_path, "cloth", img_name)).convert(
                 "RGB"
             )
+
             c[key] = transforms.Resize(self.load_width, interpolation=2)(c[key])
             cm[key] = Image.open(osp.join(self.data_path, "cloth-mask", c_name[key]))
             cm[key] = transforms.Resize(self.load_width, interpolation=0)(cm[key])

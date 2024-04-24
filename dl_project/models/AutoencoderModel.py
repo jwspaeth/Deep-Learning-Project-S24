@@ -224,25 +224,33 @@ class UNetModel_Lit(L.LightningModule):
 
         # Model
         model_output = self.model(cat_input)
-        coarse_result = model_output[:, :3, :, :]
-        cloth_mask = model_output[:, 3:4, :, :]
+        # coarse_result = model_output[:, :3, :, :]
+        # cloth_mask = model_output[:, 3:4, :, :]
 
         # Loss estimation
         target_img = batch["img"]
-        target_cloth = batch["cloth_warped_mask"]["unpaired"]
+        # target_cloth = batch["cloth_warped_mask"]["unpaired"]
 
-        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
-            cloth_mask, target_cloth
-        )
+        # loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
+        #     cloth_mask, target_cloth
+        # )
+        loss = F.mse_loss(model_output,target_img)
         self.log("loss", loss)
 
         # Track output image
-        image = model_output[:, :3, :, :]
-        # image = batch["cloth_mask"]["unpaired"]
-        self.validation_step_outputs_cr.append(image)
-        image = model_output[:, 3:4, :, :]
-        # image = target_cloth
-        self.validation_step_outputs_cm.append(image)
+        # image = model_output[:, :3, :, :]
+        # image = batch["cloth_warped_mask"]["unpaired"]
+        # self.validation_step_outputs_cr.append(model_output)
+        # image = model_output[:, 3:4, :, :]
+        # image = batch_cloth
+
+        # Target image
+        # image = target_img
+        # self.validation_step_outputs_cr.append(image)
+
+        # # Model output image
+        # image = target_img
+        # self.validation_step_outputs_cm.append(model_output)
 
         return loss
 
@@ -258,17 +266,33 @@ class UNetModel_Lit(L.LightningModule):
 
         # Model
         model_output = self.model(cat_input)
-        coarse_result = model_output[:, :3, :, :]
-        cloth_mask = model_output[:, 3:4, :, :]
+        # coarse_result = model_output[:, :3, :, :]
+        # cloth_mask = model_output[:, 3:4, :, :]
 
         # Loss estimation
         target_img = batch["img"]
-        target_cloth = batch["cloth_mask"]["unpaired"]
+        # target_cloth = batch["cloth_warped_mask"]["unpaired"]
 
-        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
-            cloth_mask, target_cloth
-        )
+        # loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
+        #     cloth_mask, target_cloth
+        # )
+        loss = F.mse_loss(model_output,target_img)
         self.log("loss", loss)
+
+        # Track output image
+        # image = model_output[:, :3, :, :]
+        # image = batch["cloth_warped_mask"]["unpaired"]
+        # self.validation_step_outputs_cr.append(model_output)
+        # image = model_output[:, 3:4, :, :]
+        # image = batch_cloth
+
+        # Target image
+        image = target_img
+        self.validation_step_outputs_cr.append(image)
+
+        # Model output image
+        image = target_img
+        self.validation_step_outputs_cm.append(model_output)
         
         return loss
 
@@ -292,10 +316,10 @@ class UNetModel_Lit(L.LightningModule):
             os.makedirs(image_dir)
         for i in range(all_preds_cr.shape[0]):
             pred = cv2.cvtColor(all_preds_cr[i], cv2.COLOR_RGB2BGR)
-            cv2.imwrite(f"{image_dir}/{i:04d}_cr.png", pred)
+            cv2.imwrite(f"{image_dir}/{i:04d}_target_img.png", pred)
         for i in range(all_preds_cm.shape[0]):
             pred = cv2.cvtColor(all_preds_cm[i], cv2.COLOR_RGB2BGR)
-            cv2.imwrite(f"{image_dir}/{i:04d}_cm.png", pred)
+            cv2.imwrite(f"{image_dir}/{i:04d}_model_output.png", pred)
 
     def test_step(self, batch, batch_idx):
         # Model inputs
@@ -309,17 +333,28 @@ class UNetModel_Lit(L.LightningModule):
 
         # Model
         model_output = self.model(cat_input)
-        coarse_result = model_output[:, :3, :, :]
-        cloth_mask = model_output[:, 3:4, :, :]
+        # coarse_result = model_output[:, :3, :, :]
+        # cloth_mask = model_output[:, 3:4, :, :]
 
         # Loss estimation
         target_img = batch["img"]
-        target_cloth = batch["cloth_mask"]["unpaired"]
+        # target_cloth = batch["cloth_warped_mask"]["unpaired"]
 
-        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
-            cloth_mask, target_cloth
-        )
+        # loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
+        #     cloth_mask, target_cloth
+        # )
+        loss = F.mse_loss(model_output,target_img)
         self.log("loss", loss)
+
+        # Track output image
+        # image = model_output[:, :3, :, :]
+        # image = batch["cloth_warped_mask"]["unpaired"]
+        # image = target_img
+        # self.validation_step_outputs_cr.append(image)
+        # self.validation_step_outputs_cr.append(model_output)
+        # image = model_output[:, 3:4, :, :]
+        # image = batch_cloth
+        # self.validation_step_outputs_cm.append(image)
         
         return loss
 
@@ -335,17 +370,28 @@ class UNetModel_Lit(L.LightningModule):
 
         # Model
         model_output = self.model(cat_input)
-        coarse_result = model_output[:, :3, :, :]
-        cloth_mask = model_output[:, 3:4, :, :]
+        # coarse_result = model_output[:, :3, :, :]
+        # cloth_mask = model_output[:, 3:4, :, :]
 
         # Loss estimation
         target_img = batch["img"]
-        target_cloth = batch["cloth_mask"]["unpaired"]
+        # target_cloth = batch["cloth_warped_mask"]["unpaired"]
 
-        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
-            cloth_mask, target_cloth
-        )
+        # loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
+        #     cloth_mask, target_cloth
+        # )
+        loss = F.mse_loss(model_output,target_img)
         self.log("loss", loss)
+
+        # Track output image
+        # image = model_output[:, :3, :, :]
+        # image = batch["cloth_warped_mask"]["unpaired"]
+        # # image = target_img
+        # # self.validation_step_outputs_cr.append(image)
+        # self.validation_step_outputs_cr.append(model_output)
+        # # image = model_output[:, 3:4, :, :]
+        # # image = batch_cloth
+        # # self.validation_step_outputs_cm.append(image)
 
         return loss
 
