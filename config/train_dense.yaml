@@ -16,6 +16,9 @@ trainer:
   limit_val_batches: 10 # Included as debugging tool
   log_every_n_steps: 5
 
+logger:
+  save_dir: ${core.output_dir}/tb_logs
+
 data:
   shuffle: True
   batch_size: 1

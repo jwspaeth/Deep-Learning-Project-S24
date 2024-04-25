@@ -2,6 +2,7 @@ import os
 
 import hydra
 import lightning as L
+from lightning.pytorch.loggers import TensorBoardLogger
 from omegaconf import DictConfig, OmegaConf
 
 from dl_project.datasets import VITONDataLoader, VITONDataModule, VITONDataset
@@ -18,8 +19,11 @@ def main(cfg: DictConfig):
     # model
     model = hydra.utils.instantiate(cfg.model)
 
+    # logger
+    logger = TensorBoardLogger(**cfg.logger)
+
     # train model
-    trainer = L.Trainer(**cfg.trainer)
+    trainer = L.Trainer(**cfg.trainer, logger=logger)
     trainer.fit(model=model, datamodule=datamodule)
 
 
