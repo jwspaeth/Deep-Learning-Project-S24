@@ -3,3 +3,4 @@ from .DenseModel import *
 from .DiffusionModel import *
 from .GAN import *
 from .AutoencoderModel import *
+from .VitModel import *

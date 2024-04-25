@@ -1,0 +1,39 @@
+core:
+  name: train_vit
+  output_dir: ./output/${core.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+hydra:
+  run:
+    dir: ${core.output_dir}
+
+## Populated with default values from VITON-HD github
+## Parameters explained in their respective classes
+trainer:
+  accelerator: auto
+  max_epochs: 10
+  default_root_dir: ${core.output_dir}
+  limit_train_batches: 6 # Included as debugging tool
+  limit_val_batches: 6 # Included as debugging tool
+  log_every_n_steps: 3
+
+data:
+  shuffle: True
+  batch_size: 1
+  workers: 1
+  load_height: 1024
+  load_width: 768
+  semantic_nc: 13
+  dataset_dir: data/zalando-hd-resized
+
+model:
+  _target_: dl_project.models.ViT_Lit
+  embed_dim: 256
+  hidden_dim: 512
+  num_heads: 8
+  num_layers: 6
+  patch_size: 4
+  num_channels: 22
+  num_patches: 64
+  dropout: 0.2
+  lr: 2e-4
+
