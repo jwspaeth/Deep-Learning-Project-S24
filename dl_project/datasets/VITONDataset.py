@@ -183,7 +183,7 @@ class VITONDataset(data.Dataset):
         cwm = {}
 
         for key in self.c_names:
-            
+
             c_name[key] = self.c_names[key][index]
 
             # c[key] = Image.open(osp.join(self.data_path, "cloth", c_name[key])).convert(
@@ -264,7 +264,9 @@ class VITONDataset(data.Dataset):
         # load person image
         img = Image.open(osp.join(self.data_path, "image", img_name))
         img = transforms.Resize(self.load_width, interpolation=2)(img)
-        img_agnostic = self.get_img_agnostic(img, parse, pose_data)
+        # img_agnostic = self.get_img_agnostic(img, parse, pose_data)
+        img_agnostic = Image.open(osp.join(self.data_path, "agnostic-v3.2", img_name))
+        img_agnostic = transforms.Resize(self.load_width, interpolation=2)(img_agnostic)
         img = self.transform(img)
         img_agnostic = self.transform(img_agnostic)  # [-1,1]
 
