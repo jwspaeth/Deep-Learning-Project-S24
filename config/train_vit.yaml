@@ -26,14 +26,14 @@ data:
   dataset_dir: data/zalando-hd-resized
 
 model:
-  _target_: dl_project.models.ViT_Lit
+  _target_: dl_project.models.Vit_Lit
   embed_dim: 256
   hidden_dim: 512
   num_heads: 8
   num_layers: 6
-  patch_size: 4
-  num_channels: 22
-  num_patches: 64
+  patch_size: 64
+  num_channels: 3
+  num_patches: 192
   dropout: 0.2
   lr: 2e-4
 

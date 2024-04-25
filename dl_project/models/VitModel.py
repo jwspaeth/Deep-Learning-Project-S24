@@ -57,6 +57,18 @@ class AttentionBlock(nn.Module):
         x = x + self.linear(self.layer_norm_2(x))
         return x
 
+class PatchEmbedding(nn.Module):
+    def __init__(self, in_channels, patch_size, emb_size):
+        super().__init__()
+        self.patch_size = patch_size
+        self.proj = nn.Conv2d(in_channels, emb_size, kernel_size=patch_size, stride=patch_size)
+
+    def forward(self, x):
+        x = self.proj(x)  # B, emb_size, H/P, W/P
+        x = x.flatten(2)  # B, emb_size, N (N is number of patches)
+        x = x.transpose(1, 2)  # B, N, emb_size
+        return x
+
 class VisionTransformer(nn.Module):
     
     def __init__(self, embed_dim, hidden_dim, num_channels, num_heads, num_layers, patch_size, num_patches, dropout=0.0):
@@ -73,40 +85,66 @@ class VisionTransformer(nn.Module):
             dropout - Amount of dropout to apply in the feed-forward network and 
                       on the input encoding
         """
-        super(VisionTransformer,self).__init__()
+        super().__init__()
         
         self.patch_size = patch_size
+
+        self.patch_embedding = PatchEmbedding(num_channels, patch_size, embed_dim)
         
         # Layers/Networks
         self.input_layer = nn.Linear(num_channels*(patch_size**2), embed_dim)
         self.transformer = nn.Sequential(*[AttentionBlock(embed_dim, hidden_dim, num_heads, dropout=dropout) for _ in range(num_layers)])
         
-        self.to_pixels = nn.Sequential(
+        """ self.to_pixels = nn.Sequential(
             nn.LayerNorm(embed_dim),
             nn.Linear(embed_dim, patch_size*patch_size*3)
-        )
+        ) """
         
-        # Parameters/Embeddings
-        self.pos_embedding = nn.Parameter(torch.randn(1,1+num_patches,embed_dim))
+        # Position Embeddings
+        self.pos_embedding = nn.Parameter(torch.randn(1,num_patches,embed_dim))
+
+        self.initial_projection = nn.Linear(256, 256 * 4)  # Upsample feature dimension
+
+        self.conv_transpose1 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1)  # Upsample to 24x32
+        self.conv_transpose2 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1)   # Upsample to 48x64
+        self.conv_transpose3 = nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1)    # Upsample to 96x128
+        self.conv_transpose4 = nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1)    # Upsample to 192x256
+
+        # Final convolution to get to 3 channels for an RGB image
+        self.final_conv = nn.Conv2d(16, 3, kernel_size=3, padding=1)
     
     
     def forward(self, x):
-        # Preprocess input
-        x = img_to_patch(x, self.patch_size)
-        B, T, _ = x.shape
-        x = self.input_layer(x)
         
-        # Add positional encoding
-        x = x + self.pos_embedding[:,:T+1]
+        # Preprocess input
+        print("Original Image:", x.shape)
+        x = self.patch_embedding(x)    
+        print("Patches:", x.shape)    
+        B, T, _ = x.shape
+        x += self.pos_embedding
         
         # Apply Transforrmer
         #x = self.dropout(x)
         x = x.transpose(0, 1)
         x = self.transformer(x)
+        print("Output transformer:", x.shape)
+
         
-        # Translate to pixels
-        x = self.to_pixels(x)
-        out = x.view(B, 64, 64, 3)
+        # Upsample
+        # TODO: Change for batchsize
+        x = x.view(-1, 256)
+        print(x.shape)
+        x = self.initial_projection(x)  # Map features to a higher dimension
+        x = x.view(-1, 12, 16, 256)  # Reshape to spatial dimensions (assuming the patches were 12x16 grid), with batch handling
+        
+        # Apply transposed convolutions
+        x = F.relu(self.conv_transpose1(x))
+        x = F.relu(self.conv_transpose2(x))
+        x = F.relu(self.conv_transpose3(x))
+        x = F.relu(self.conv_transpose4(x))
+
+        # Final convolution to get the RGB image
+        out = self.final_conv(x)
 
         return out
 
@@ -141,7 +179,7 @@ class conv_layer(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
-class ViT_Lit(L.LightningModule):
+class Vit_Lit(L.LightningModule):
     
     def __init__(self, lr: int = 1e-3, **kwargs):
         super().__init__()
@@ -153,7 +191,7 @@ class ViT_Lit(L.LightningModule):
         return self.model(x)
     
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.parameters(), lr=self.hparams.lr)
+        optimizer = optim.AdamW(self.parameters(), lr=self.lr)
         lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100,150], gamma=0.1)
         return [optimizer], [lr_scheduler]   
     
@@ -165,7 +203,7 @@ class ViT_Lit(L.LightningModule):
         cat_input = torch.cat((batch_pose,batch_img_agnostic,batch_parse_agnostic,batch_cloth),dim=1)
         
         # Model
-        model_output = self.model(cat_input)
+        model_output = self.model(batch["img_agnostic"])
         coarse_result = model_output[:, :3, :, :]
         cloth_mask = model_output[:,3:4,:,:]
         
