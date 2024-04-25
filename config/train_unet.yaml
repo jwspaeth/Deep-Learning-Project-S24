@@ -39,4 +39,5 @@ model:
   decoder_stride: 1
   padding_val: 1
   lr: 2e-3
+  validation_cache_limit: 5
 

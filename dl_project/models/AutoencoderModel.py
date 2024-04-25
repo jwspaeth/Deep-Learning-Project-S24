@@ -1,3 +1,6 @@
+import os
+
+import cv2
 import lightning as L
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,11 +9,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
-import cv2
-import os
 
 class conv_layer(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_val, stride_val, padding_val):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_val,
+        stride_val,
+        padding_val,
+    ):
         super().__init__()
 
         # The VITON U-Net contains 6 convolutional layers
@@ -202,10 +210,11 @@ class unet_model(nn.Module):
 
 
 class UNetModel_Lit(L.LightningModule):
-    def __init__(self, lr: int = 1e-3, **kwargs):
+    def __init__(self, lr: int = 1e-3, validation_cache_limit=None, **kwargs):
         super().__init__()
         self.save_hyperparameters()
 
+        self.validation_cache_limit = validation_cache_limit
         self.lr = lr
 
         self.model = unet_model(**kwargs)
@@ -234,7 +243,7 @@ class UNetModel_Lit(L.LightningModule):
         # loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
         #     cloth_mask, target_cloth
         # )
-        loss = F.mse_loss(model_output,target_img)
+        loss = F.mse_loss(model_output, target_img)
         self.log("loss", loss)
 
         # Track output image
@@ -276,7 +285,7 @@ class UNetModel_Lit(L.LightningModule):
         # loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
         #     cloth_mask, target_cloth
         # )
-        loss = F.mse_loss(model_output,target_img)
+        loss = F.mse_loss(model_output, target_img)
         self.log("loss", loss)
 
         # Track output image
@@ -285,21 +294,32 @@ class UNetModel_Lit(L.LightningModule):
         # self.validation_step_outputs_cr.append(model_output)
         # image = model_output[:, 3:4, :, :]
         # image = batch_cloth
+        if (
+            self.validation_cache_limit is not None
+            and self.cache_size < self.validation_cache_limit
+        ):
+            remainder = self.validation_cache_limit - self.cache_size
+            # Target image
+            image = target_img
+            self.validation_step_outputs_cr.append(image[:remainder])
 
-        # Target image
-        image = target_img
-        self.validation_step_outputs_cr.append(image)
+            # Model output image
+            image = target_img
+            self.validation_step_outputs_cm.append(model_output[:remainder])
 
-        # Model output image
-        image = target_img
-        self.validation_step_outputs_cm.append(model_output)
-        
         return loss
+
+    @property
+    def cache_size(self):
+        _cache_size = 0
+        for entry in self.validation_step_outputs_cm:
+            _cache_size += entry.shape[0]
+        return _cache_size
 
     def on_validation_epoch_end(self):
         # Example of saving images to tensorboard
-        if len(self.validation_step_outputs_cr)==0:
-            return 
+        if len(self.validation_step_outputs_cr) == 0:
+            return
 
         all_preds_cr = torch.cat(self.validation_step_outputs_cr, dim=0)
         all_preds_cm = torch.cat(self.validation_step_outputs_cm, dim=0)
@@ -343,7 +363,7 @@ class UNetModel_Lit(L.LightningModule):
         # loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
         #     cloth_mask, target_cloth
         # )
-        loss = F.mse_loss(model_output,target_img)
+        loss = F.mse_loss(model_output, target_img)
         self.log("loss", loss)
 
         # Track output image
@@ -355,7 +375,7 @@ class UNetModel_Lit(L.LightningModule):
         # image = model_output[:, 3:4, :, :]
         # image = batch_cloth
         # self.validation_step_outputs_cm.append(image)
-        
+
         return loss
 
     def predict_step(self, batch, batch_idx):
@@ -380,7 +400,7 @@ class UNetModel_Lit(L.LightningModule):
         # loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(
         #     cloth_mask, target_cloth
         # )
-        loss = F.mse_loss(model_output,target_img)
+        loss = F.mse_loss(model_output, target_img)
         self.log("loss", loss)
 
         # Track output image
