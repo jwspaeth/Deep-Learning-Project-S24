@@ -1,7 +1,7 @@
 core:
-  name: train_dense
+  name: predict_dense
   output_dir: ./output/${core.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
-  mode: train
+  mode: predict
   ckpt_path: null
 
 hydra:

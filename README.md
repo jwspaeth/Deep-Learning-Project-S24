@@ -9,7 +9,11 @@
 - Populate a config in "configs/" with your parameters. "train_dense.yaml" is provided as an example and runs a dummy dense network for debugging.
 
 ### Command Line
+Current usage supports training, testing, and prediction. The only difference between test and predict is that test evaluates the loss while predict expects no labels. Predict can be good for just visualizing.
+
 - Train with "python dl_project/main.py --config-name=\<config name\>"
+- Test with "python dl_project/main.py --config-name=\<config name\> core.ckpt_path=\<config name\> core.mode=test"
+- Predict with "python dl_project/main.py --config-name=\<config name\> core.ckpt_path=\<config name\> core.mode=predict"
 
 ### Jupyter Notebook
 - Open main.ipynb and run the cells. Replace the config name with your config.
