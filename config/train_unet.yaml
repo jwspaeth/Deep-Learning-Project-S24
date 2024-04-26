@@ -1,6 +1,8 @@
 core:
   name: train_unet
   output_dir: ./output/${core.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  mode: train
+  ckpt_path: null
 
 hydra:
   run:
