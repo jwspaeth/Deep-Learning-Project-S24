@@ -4,9 +4,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
+from einops.layers.torch import Rearrange
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torchvision
 
 
 def img_to_patch(x, patch_size, flatten_channels=True):
@@ -69,9 +71,39 @@ class PatchEmbedding(nn.Module):
         x = x.transpose(1, 2)  # B, N, emb_size
         return x
 
+def patchify(imgs):
+    """
+    imgs: (N, 3, H, W) x: (N, L, patch_size**2 *3)
+    """
+    p = 32 #self.vit.embeddings.patch_embeddings.patch_size[0]
+    #assert imgs.shape[2] == imgs.shape[3] and imgs.shape[2] % p == 0
+
+    #h = w = imgs.shape[2] // p
+    h = imgs.shape[2] // p
+    w = imgs.shape[3] // p
+    x = imgs.reshape(shape=(imgs.shape[0], 3, h, p, w, p))
+    x = torch.einsum("nchpwq->nhwpqc", x)
+    x = x.reshape(shape=(imgs.shape[0], h * w, p**2 * 3))
+    return x
+
+def unpatchify(x):
+    """
+    x: (N, L, patch_size**2 *3) imgs: (N, 3, H, W)
+    """
+    p = 64
+    """ h = w = int(x.shape[1] ** 0.5)
+    assert h * w == x.shape[1] """
+    h = 1 # height // 64
+    w = 1 # width // 64
+
+    x = x.reshape(shape=(x.shape[0], h, w, p, p, 3))
+    x = torch.einsum("nhwpqc->nchpwq", x)
+    imgs = x.reshape(shape=(x.shape[0], 3, h * p, h * p))
+    return imgs
+
 class VisionTransformer(nn.Module):
     
-    def __init__(self, embed_dim, hidden_dim, num_channels, num_heads, num_layers, patch_size, num_patches, dropout=0.0):
+    def __init__(self, embed_dim, hidden_dim, in_channels,out_channels, num_heads, num_layers, patch_size, num_patches, dropout=0.0):
         """
         Inputs:
             embed_dim - Dimensionality of the input feature vectors to the Transformer
@@ -88,96 +120,67 @@ class VisionTransformer(nn.Module):
         super().__init__()
         
         self.patch_size = patch_size
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.embed_dim = embed_dim
 
-        self.patch_embedding = PatchEmbedding(num_channels, patch_size, embed_dim)
+        self.patch_embedding = PatchEmbedding(self.in_channels, patch_size, embed_dim)
+        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches, embed_dim))
         
         # Layers/Networks
-        self.input_layer = nn.Linear(num_channels*(patch_size**2), embed_dim)
+        #self.input_layer = nn.Linear(num_channels*(patch_size**2), embed_dim)
         self.transformer = nn.Sequential(*[AttentionBlock(embed_dim, hidden_dim, num_heads, dropout=dropout) for _ in range(num_layers)])
-        
-        """ self.to_pixels = nn.Sequential(
-            nn.LayerNorm(embed_dim),
-            nn.Linear(embed_dim, patch_size*patch_size*3)
-        ) """
-        
-        # Position Embeddings
-        self.pos_embedding = nn.Parameter(torch.randn(1,num_patches,embed_dim))
+        #self.decoder = nn.Linear(embed_dim, num_channels * patch_size * patch_size)
 
-        self.initial_projection = nn.Linear(256, 256 * 4)  # Upsample feature dimension
+        #self.upsample1 = nn.Linear(embed_dim, 512)
 
-        self.conv_transpose1 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1)  # Upsample to 24x32
-        self.conv_transpose2 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1)   # Upsample to 48x64
-        self.conv_transpose3 = nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1)    # Upsample to 96x128
-        self.conv_transpose4 = nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1)    # Upsample to 192x256
-
-        # Final convolution to get to 3 channels for an RGB image
-        self.final_conv = nn.Conv2d(16, 3, kernel_size=3, padding=1)
-    
+        self.upsample = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(in_channels=16, out_channels=self.out_channels, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(inplace=True)
+        )
     
     def forward(self, x):
         
         # Preprocess input
-        print("Original Image:", x.shape)
+        #print()
+        H = x.shape[2] // self.patch_size
+        W = x.shape[3] // self.patch_size
+        #print("Original Image:", x.shape)
         x = self.patch_embedding(x)    
-        print("Patches:", x.shape)    
+        #x = patchify(x)
+        #print("Patches:", x.shape)    
         B, T, _ = x.shape
         x += self.pos_embedding
         
         # Apply Transforrmer
         #x = self.dropout(x)
         x = x.transpose(0, 1)
+        #print("Transformer Input:", x.shape)
         x = self.transformer(x)
-        print("Output transformer:", x.shape)
+        x = x.transpose(0, 1)
+        #print("Output transformer:", x.shape) # (N, B, E) (192,1,256)
 
-        
+        # Reshape (N,B,E) -> (N, L, h,w)
+        x = x.reshape(B, self.embed_dim,H,W)
+        #print("Reshaped:", x.shape)
         # Upsample
-        # TODO: Change for batchsize
-        x = x.view(-1, 256)
-        print(x.shape)
-        x = self.initial_projection(x)  # Map features to a higher dimension
-        x = x.view(-1, 12, 16, 256)  # Reshape to spatial dimensions (assuming the patches were 12x16 grid), with batch handling
+        out = self.upsample(x)
+        #print("Output upsample:", out.shape)    
         
-        # Apply transposed convolutions
-        x = F.relu(self.conv_transpose1(x))
-        x = F.relu(self.conv_transpose2(x))
-        x = F.relu(self.conv_transpose3(x))
-        x = F.relu(self.conv_transpose4(x))
 
-        # Final convolution to get the RGB image
-        out = self.final_conv(x)
+        # TODO: Make more complex decoder
+        #x = self.decoder(x)
+        #out = x.view(B, self.num_channels, 512, 512)
 
         return out
-
-class conv_layer(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_val, stride_val, padding_val):
-        super().__init__()
-
-        # The VITON U-Net contains 6 convolutional layers
-        self.conv = nn.Sequential(
-            nn.Conv2d(
-                in_channels,
-                out_channels,
-                kernel_size=kernel_val,
-                stride=stride_val,
-                padding=padding_val,
-                bias=False
-            ),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(
-                out_channels,
-                out_channels,
-                kernel_size=kernel_val,
-                stride=stride_val,
-                padding=padding_val,
-                bias=False
-            ),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        )
-
-    def forward(self, x):
-        return self.conv(x)
 
 class Vit_Lit(L.LightningModule):
     
@@ -203,15 +206,27 @@ class Vit_Lit(L.LightningModule):
         cat_input = torch.cat((batch_pose,batch_img_agnostic,batch_parse_agnostic,batch_cloth),dim=1)
         
         # Model
-        model_output = self.model(batch["img_agnostic"])
-        coarse_result = model_output[:, :3, :, :]
-        cloth_mask = model_output[:,3:4,:,:]
+        model_output = self.model(cat_input)
+        #print(model_output.shape)
+        coarse_result = model_output #[:, :3, :, :]
+        #cloth_mask = model_output[:,3:4,:,:]
         
         # Loss estimation
         target_img = batch["img"]
-        target_cloth = batch["cloth_mask"]["unpaired"]
+        #target_cloth = batch["cloth_mask"]["unpaired"]
 
-        loss = F.mse_loss(coarse_result, target_img) + F.l1_loss(cloth_mask, target_cloth)
+        loss = F.mse_loss(coarse_result, target_img) #+ F.l1_loss(cloth_mask, target_cloth)
+
+        self.log(f"{mode}_loss", loss)  
+
+        #print(coarse_result.shape)
+        if mode == "val":
+            reconstructed_img_np = torchvision.utils.make_grid(coarse_result, normalize=True).cpu().detach().numpy()
+            original_img_np = torchvision.utils.make_grid(target_img, normalize=True).cpu().detach().numpy()
+            self.logger.experiment.add_image(f'{mode}_reconstructed_images', reconstructed_img_np, global_step=self.current_epoch)
+            self.logger.experiment.add_image(f'{mode}_original_images', original_img_np, global_step=self.current_epoch)
+
+
         return loss
 
     def training_step(self, batch, batch_idx):

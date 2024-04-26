@@ -1,6 +1,8 @@
 core:
   name: train_vit
   output_dir: ./output/${core.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  mode: train
+  ckpt_path: /home/jack/Code/VITON/Deep-Learning-Project-S24/output/train_vit/2024-04-26/14-10-14/lightning_logs/version_0/checkpoints/epoch=4-step=7275.ckpt
 
 hydra:
   run:
@@ -10,18 +12,18 @@ hydra:
 ## Parameters explained in their respective classes
 trainer:
   accelerator: auto
-  max_epochs: 10
+  max_epochs: 50
   default_root_dir: ${core.output_dir}
-  limit_train_batches: 6 # Included as debugging tool
+  #limit_train_batches: -1 # Included as debugging tool
   limit_val_batches: 6 # Included as debugging tool
   log_every_n_steps: 3
 
 data:
   shuffle: True
-  batch_size: 1
+  batch_size: 8
   workers: 1
-  load_height: 1024
-  load_width: 768
+  load_height: 512 #1024
+  load_width: 384 #768
   semantic_nc: 13
   dataset_dir: data/zalando-hd-resized
 
@@ -29,10 +31,11 @@ model:
   _target_: dl_project.models.Vit_Lit
   embed_dim: 256
   hidden_dim: 512
-  num_heads: 8
-  num_layers: 6
-  patch_size: 64
-  num_channels: 3
+  num_heads: 2
+  num_layers: 3
+  patch_size: 32
+  in_channels: 22
+  out_channels: 3
   num_patches: 192
   dropout: 0.2
   lr: 2e-4
