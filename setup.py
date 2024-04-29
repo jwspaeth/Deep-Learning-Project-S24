@@ -13,5 +13,6 @@ setup(
         "dropbox",
         "matplotlib",
         "opencv-python",
+        "einops",
     ],
 )
