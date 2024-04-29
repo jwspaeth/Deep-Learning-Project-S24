@@ -17,13 +17,14 @@ trainer:
   limit_train_batches: 10 # Included as debugging tool
   limit_val_batches: 10 # Included as debugging tool
   log_every_n_steps: 5
+  precision: 16
 
 logger:
   save_dir: ${core.output_dir}/tb_logs
 
 data:
   shuffle: True
-  batch_size: 8
+  batch_size: 16
   workers: 1
   load_height: 512
   load_width: 384

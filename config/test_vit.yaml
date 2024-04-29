@@ -1,7 +1,7 @@
 core:
-  name: train_vit
+  name: test_vit
   output_dir: ./output/${core.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
-  mode: train
+  mode: test
   #ckpt_path: null
   ckpt_path: /home/jack/Code/VITON/Deep-Learning-Project-S24/output/train_vit/2024-04-27/13-38-16/tb_logs/lightning_logs/version_0/checkpoints/epoch=31-step=46560.ckpt
 
@@ -17,6 +17,7 @@ trainer:
   default_root_dir: ${core.output_dir}
   #limit_train_batches: -1 # Included as debugging tool
   limit_val_batches: 6 # Included as debugging tool
+  limit_test_batches: 1 # Included as debugging tool
   log_every_n_steps: 3
 
 logger:
