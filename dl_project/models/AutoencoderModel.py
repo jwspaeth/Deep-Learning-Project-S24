@@ -153,7 +153,7 @@ class unet_model(nn.Module):
             decoder_channels[3], out_channels, kernel_size=1, padding=0
         )
 
-    def forward(self, x):
+    def forward(self, x, noise=None):
         skip_connections = []
 
         s1 = self.enc_conv1.forward(x)
@@ -177,7 +177,11 @@ class unet_model(nn.Module):
         # print(f"S4: {s4.shape}. P4: {p4.shape}")
 
         # Bottleneck
-        bn = self.bottleneck(p4)
+        if noise is not None:
+            compressed = p4 + noise
+        else:
+            compressed = p4
+        bn = self.bottleneck(compressed)
         # print(f"BN: {bn.shape}.")
 
         # Decoder
