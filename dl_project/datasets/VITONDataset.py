@@ -299,7 +299,7 @@ class VITONDataLoader:
         self.data_loader = data.DataLoader(
             dataset,
             batch_size=batch_size,
-            shuffle=(train_sampler is None),
+            shuffle=shuffle,
             num_workers=workers,
             pin_memory=True,
             drop_last=True,
